@@ -1,5 +1,11 @@
 -- An API for the Mine-azon delivery service
 
+-- Math stuff
+
+function sign(number)
+    return number > 0 and 1 or (number == 0 and 0 or -1)
+end
+
 -- Movement systems
 
 function initialisePosition()
@@ -38,7 +44,7 @@ function determineDirection()
     turtle.back()
 end
 
-function moveForward(amount)
+function moveForward(amount, divertPriority)
     local direction = textutils.unserialise(settings.get("direction"))
     local xMovement = (direction - 2) * (direction % 2) * amount
     local zMovement = (direction - 3) * ((direction + 1) % 2) * amount
@@ -48,7 +54,15 @@ function moveForward(amount)
     settings.set("position", textutils.serialise(position))
     
     for i = 1, math.abs(amount) do
-        if amount > 0 then turtle.forward() 
+        if amount > 0 then 
+            local blockInFront = turtle.detect()
+            while blockInFront do
+                -- Priorities left or right 
+                if divertPriority == 1 then shiftRight(1)
+                else shiftLeft(1) end
+                blockInFront = turtle.detect()
+            end
+            turtle.forward() 
         else turtle.back() end
     end
     settings.save(".settings")
@@ -120,11 +134,14 @@ end
 
 function moveToPoint(endPosition)
     local position = textutils.unserialise(settings.get("position"))
+    if position == endPosition then return end
     local directionToMove = endPosition - position
     
     -- Move Up first
     if directionToMove.y > 0 then 
         moveUp(directionToMove.y)
+        position = textutils.unserialise(settings.get("position"))
+        directionToMove = endPosition - position
     end
     
     -- move X
@@ -133,7 +150,9 @@ function moveToPoint(endPosition)
     else
         faceDirection(1)
     end
-    moveForward(math.abs(directionToMove.x))
+    moveForward(math.abs(directionToMove.x), sign(directionToMove.z))
+    position = textutils.unserialise(settings.get("position"))
+    directionToMove = endPosition - position
 
     -- Move Y
     if directionToMove.z > 0 then
@@ -142,6 +161,8 @@ function moveToPoint(endPosition)
         faceDirection(2)
     end
     moveForward(math.abs(directionToMove.z))
+    position = textutils.unserialise(settings.get("position"))
+    directionToMove = endPosition - position
 
     -- move down last
     if directionToMove.y < 0 then
@@ -151,6 +172,15 @@ end
 
 function tableToVector(table)
     return vector.new(table.x, table.y, table.z)
+end
+
+function readInvetoryData()
+    local inventory = {}
+    for slot = 1, 16 do
+        local item = turtle.getItemDetail(slot)
+        table.insert(inventory, slot, item)
+    end
+    return inventory
 end
 
 function readShulkerData(invetorySlot)
@@ -208,6 +238,7 @@ return {
 
         tableToVector = tableToVector,
 
+        readInvetoryData = readInvetoryData,
         readShulkerData = readShulkerData,
         setUpArea = setUpArea,
     }
